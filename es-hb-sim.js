@@ -36,7 +36,12 @@ if (clusterURL == null) logError('clusterURL parameter missing')
 let esClient
 
 try {
-  esClient = new es.Client({ node: clusterURL })
+  esClient = new es.Client({
+    node: clusterURL,
+    ssl: {
+      rejectUnauthorized: false
+    }
+  })
 } catch (err) {
   logError(`error creating ES client: ${err.message}`)
 }
