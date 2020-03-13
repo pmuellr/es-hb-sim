@@ -24,13 +24,17 @@ if (cliOptions.flags.help || cliOptions.input.length === 0) {
   process.exit(1)
 }
 
-const [intervalS, indexName, monitorName, clusterURL] = cliOptions.input
+const [intervalS, instancesS, indexName, clusterURL] = cliOptions.input
 
 if (intervalS == null) logError('intervalSeconds parameter missing')
 const interval = parseInt(intervalS, 10)
 if (isNaN(interval)) logError(`invalid interval parameter: ${intervalS}`)
+
+if (instancesS == null) logError('instances parameter missing')
+const instances = Math.min(9, parseInt(instancesS, 10))
+if (isNaN(instances)) logError(`invalid instances parameter: ${instancesS}`)
+
 if (indexName == null) logError('indexName parameter missing')
-if (monitorName == null) logError('monitorName parameter missing')
 if (clusterURL == null) logError('clusterURL parameter missing')
 
 let esClient
@@ -46,26 +50,40 @@ try {
   logError(`error creating ES client: ${err.message}`)
 }
 
-let UpStatus = false
+const UpStatus = []
+for (let i = 1; i <= instances; i++) {
+  UpStatus[i] = true
+}
+
 let DocsWritten = 0
 
-printRuntimeHelp()
 
-toggleUp()
-setInterval(writeDoc, interval * 1000)
+setInterval(writeDocs, interval * 1000)
 setInterval(logDocsWritten, 30 * 1000)
 
 kbd.on(null, printRuntimeHelp)
 kbd.on('c-c', () => process.exit())
 kbd.on('q', () => process.exit())
-kbd.on('u', toggleUp)
+for (let i = 0; i < instances; i++) {
+  kbd.on(String.fromCharCode(49 + i), () => toggleUp(i + 1))
+}
+
+console.log('sample doc:', JSON.stringify(generateDoc(1), null, 4))
+printRuntimeHelp()
+printCurrentStatus()
 
 function logDocsWritten () {
   console.log(`total docs written: ${DocsWritten}`)
 }
 
-async function writeDoc () {
-  const doc = generateDoc()
+async function writeDocs (i) {
+  for (let i = 1; i <= instances; i++) {
+    writeDoc(i)
+  }
+}
+
+async function writeDoc (index) {
+  const doc = generateDoc(index)
 
   let response
   try {
@@ -84,46 +102,66 @@ async function writeDoc () {
   DocsWritten++
 }
 
-function toggleUp () {
-  UpStatus = !UpStatus
-
-  const doc = JSON.parse(JSON.stringify(generateDoc()))
-  delete doc.event
-  delete doc.agent
-  console.log('now writing:', JSON.stringify(doc))
+function toggleUp (index) {
+  UpStatus[index] = !UpStatus[index]
+  printCurrentStatus()
 }
 
+function printCurrentStatus () {
+  const statusLine = []
+  for (let i = 1; i <= instances; i++) {
+    const status = UpStatus[i] ? '⬆︎' : '⬇︎'
+    statusLine.push(`${hostName(i)} ${status}`)
+  }
+
+  console.log(statusLine.join('   '));
+}
 function printRuntimeHelp () {
-  console.log('help: press "u" to toggle up/down, "q" to exit')
+  console.log(`help: press "1" ... "${instances}" to toggle up/down, "q" to exit`)
 }
 
-function generateDoc () {
+function generateDoc (index) {
+  const upStatus = UpStatus[index]
+
   return {
     '@timestamp': new Date().toISOString(),
-    event: {
+    event: { 
       dataset: 'uptime'
     },
     agent: {
       type: 'heartbeat'
     },
     summary: {
-      up: UpStatus ? 1 : 0,
-      down: UpStatus ? 0 : 1
+      up: upStatus ? 1 : 0,
+      down: upStatus ? 0 : 1
     },
     monitor: {
-      status: UpStatus ? 'up' : 'down',
-      name: monitorName
+      status: upStatus ? 'up' : 'down',
+      name: hostName(index)
     }
   }
 }
 
+function hostName (index) {
+  return `host-${index}`
+}
+
 function getHelp () {
   return `
-es-hb-sim <intervalSeconds> <indexName> <monitorName> <clusterURL>
+es-hb-sim <intervalSeconds> <instances> <indexName> <clusterURL>
 
 Writes ES heartbeat documents on an interval, allowing the up/down state to
 be changed with keyboard presses.
-  `.trim()
+
+Fields in documents written:
+  @timestamp              current time
+  event.dataset.keyword   'uptime'
+  agent.type,keyword      'heartbeat'
+  summary.up              1 | 0
+  summary.down            0 | 1
+  monitor.status.keyword  'up' | 'down'
+  monitor.status.name     'host-<instance>'
+`.trim()
 }
 
 function logError (message) {

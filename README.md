@@ -5,14 +5,11 @@ es-hb-sim - elasticsearch heartbeat simulattor
 documents directly into elasticsearch, allowing the up/down state to be
 modified live via keypress.
 
+example
+================================================================================
+
 ```console
-$ es-hb-sim 1 monitor-sample host-A https://elastic:changeme@localhost:9200
-help: press "u" to toggle up/down, "q" to exit
-now writing: {"@timestamp":"2019-12-15T17:16:44.765Z","summary":{"up":1,"down":0},"monitor":{"status":"up","name":"host-A"}}
-total docs written: 29
-now writing: {"@timestamp":"2019-12-15T17:17:20.317Z","summary":{"up":0,"down":1},"monitor":{"status":"down","name":"host-A"}}
-now writing: {"@timestamp":"2019-12-15T17:17:43.170Z","summary":{"up":1,"down":0},"monitor":{"status":"up","name":"host-A"}}
-total docs written: 59
+$ es-hb-sim 1 4 es-hb-sim https://elastic:changeme@localhost:9200
 ...
 ```
 
@@ -21,15 +18,16 @@ usage
 ================================================================================
 
 ```
-es-hb-sim <interval> <index-name> <monitor-name> <elastic-search-url>
+es-hb-sim <interval> <instances> <index-name> <elastic-search-url>
 ```
 
-Every `<interval>` seconds, a document will be written to `<index-name>` at
-the elasticsearch cluster `<elastic-search-url>` using the specified
-`<monitor-name>`.
+Every `<interval>` seconds, `<instances>` documents will be written to 
+`<index-name>` at the elasticsearch cluster `<elastic-search-url>`, each 
+document for a different monitor name.
 
 You can quit the program by pressing `q` or `control-c`.  You can toggle the
-state of the document written (up/down) by pressing `u`.
+up/down state of a particular instance by pressing the number key of it's
+instance, eg, `1`, `2`, ... `0` (for 10).
 
 Every 30 seconds, the number of documents indexed is logged.
 
@@ -51,7 +49,7 @@ more fields.
     },
     monitor: {
         status: 'up' || 'down',
-        name: '<monitor-name>'
+        name: 'host-${instance}'
     }
 }
 ```
