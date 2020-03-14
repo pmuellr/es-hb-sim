@@ -70,7 +70,6 @@ for (let i = 0; i < instances; i++) {
 
 console.log('sample doc:', JSON.stringify(generateDoc(1), null, 4))
 printRuntimeHelp()
-printCurrentStatus()
 
 function logDocsWritten () {
   console.log(`total docs written: ${DocsWritten}`)
@@ -118,6 +117,7 @@ function printCurrentStatus () {
 }
 function printRuntimeHelp () {
   console.log(`help: press "1" ... "${instances}" to toggle up/down, "q" to exit`)
+  printCurrentStatus()
 }
 
 function generateDoc (index) {
